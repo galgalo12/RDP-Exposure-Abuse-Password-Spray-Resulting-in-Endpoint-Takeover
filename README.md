@@ -82,4 +82,65 @@ This activity likely represents **pre-compromise reconnaissance or credential ac
 
 Despite the clear brute-force indicators, **no Microsoft Defender for Endpoint alerts were generated**, highlighting a missed detection opportunity during the credential access phase.
 
+<img width="484" height="188" alt="Failure" src="https://github.com/user-attachments/assets/89b59fe9-162f-45c6-acb1-0c5ece43d082" />
+
+## 🧪 Authentication Telemetry & OSINT Correlation
+
+To quantify authentication activity by source IP, the following KQL query was executed against **Microsoft Defender for Endpoint** telemetry:
+
+```kql
+DeviceLogonEvents
+| where DeviceName contains "Windows-11-pro"
+| where Timestamp between (datetime(2026-01-11) .. datetime(2026-01-15))
+| summarize 
+    Failures   = countif(ActionType == "LogonFailed"),
+    Successes  = countif(ActionType == "LogonSuccess"),
+    Users      = dcount(AccountName)
+by RemoteIP
+```
+## 📊 Results — Source IP: `169.71.116.189`
+
+- **Failed Logon Attempts:** 18  
+- **Successful Logons:** 0  
+- **Distinct Accounts Targeted:** 2  
+- **Targeted Host:** `Windows-11-pro`  
+- **Authentication Method:** RDP  
+
+---
+
+## 🌐 Network Attribution
+
+- **IP Address:** `169.71.116.189`  
+- **Autonomous System (ASN):** DIGITALOCEAN-ASN  
+- **Hosting Type:** Cloud Infrastructure (High Abuse Potential)  
+
+---
+
+## 🕵️ OSINT Findings
+
+Open-source intelligence enrichment for the source IP revealed:
+
+- 🚩 Flagged as **malicious** on **VirusTotal**
+- 🚫 Reported for **abusive activity** on **AbuseIPDB**
+
+---
+
+## 🧠 Assessment
+
+The combination of:
+
+- Repeated failed RDP authentication attempts  
+- Targeting of multiple local accounts  
+- Origin from cloud-hosted infrastructure  
+- Corroborating OSINT intelligence  
+
+strongly supports classification of this activity as a **malicious brute-force attack attempt**  
+(**MITRE ATT&CK: T1110.001 – Brute Force: Password Guessing**).
+
+While this specific source IP did **not** achieve successful authentication, it represents a **credible threat** and highlights gaps in preventive controls, such as:
+- Inadequate RDP exposure restrictions  
+- Absence of conditional access policies  
+- Insufficient account lockout or throttling mechanisms  
+
+
 
