@@ -125,22 +125,59 @@ Open-source intelligence enrichment for the source IP revealed:
 
 ---
 
-## 🧠 Assessment
 
-The combination of:
+<img width="883" height="331" alt="virustotal" src="https://github.com/user-attachments/assets/0f6a86bf-7e8e-430a-8180-e3a02ab02dac" />
 
-- Repeated failed RDP authentication attempts  
-- Targeting of multiple local accounts  
-- Origin from cloud-hosted infrastructure  
-- Corroborating OSINT intelligence  
 
-strongly supports classification of this activity as a **malicious brute-force attack attempt**  
-(**MITRE ATT&CK: T1110.001 – Brute Force: Password Guessing**).
+## 🧩 Post-Login Activity
 
-While this specific source IP did **not** achieve successful authentication, it represents a **credible threat** and highlights gaps in preventive controls, such as:
-- Inadequate RDP exposure restrictions  
-- Absence of conditional access policies  
-- Insufficient account lockout or throttling mechanisms  
+Immediately following successful authentication, the adversary initiated a series of **post-exploitation actions** indicative of automated attacker tradecraft.
 
+### 🔎 Execution & Discovery
+
+- Execution of **PowerShell** and **Command Prompt (CMD)** for system and environment discovery
+- Use of native Windows utilities (LOLBins) to enumerate host configuration, users, and processes
+
+### 🧪 Suspicious Script Execution
+
+The following **PowerShell scripts** were executed shortly after logon:
+
+- `update_check.ps1`
+- `wmi_maintenance.ps1`
+- `mscloudsync.ps1`
+
+<img width="940" height="422" alt="Powershell" src="https://github.com/user-attachments/assets/4e2d9287-d840-441e-861d-6b7879a7a142" />
+
+## 🌐 Command-and-Control (C2) Network Activity
+
+Post-compromise analysis identified **outbound network connections** from the compromised host **`Windows-11-pro`** to the external IP address **`50.116.54.114`**, consistent with **command-and-control (C2) communication**.
+
+### 🔗 Observed Network Behavior
+
+- **Destination IP:** `50.116.54.114`
+- **Initiating Process:** `svchost.exe`
+- **Connection Direction:** Outbound
+- **Behavior Pattern:** Periodic external connections following script execution
+
+The use of **`svchost.exe`**—a trusted Windows system binary—to initiate network traffic strongly indicates **process masquerading or injection**, enabling the attacker to blend malicious communications into normal system activity.
+
+---
+
+### 📊 Evidence: Microsoft Defender for Endpoint – DeviceNetworkEvents
+
+The following KQL query was used to pivot from host activity to network telemetry associated with the suspected C2 infrastructure:
+
+```kql
+// Pivot to network events from flare to candidate IP
+DeviceNetworkEvents
+| where DeviceName contains "Windows-11-pro"
+| where Timestamp between (datetime(2026-01-11) .. datetime(2026-01-15))
+| where RemoteIP == "50.116.54.114"
+| where InitiatingProcessCommandLine contains "svchost.exe"
+| project  Timestamp,  RemoteIP,RemotePort, InitiatingProcessFileName
+```
+
+
+<img width="1521" height="1121" alt="network" src="https://github.com/user-attachments/assets/6f628fa2-45f8-40d0-bdf2-dc01ee06a6f1" />
 
 
