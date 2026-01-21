@@ -2,7 +2,7 @@
 
 ## 🧾 Executive Summary
 
-A remote threat actor successfully compromised the **Windows 11 Pro** endpoint **`flare`** via a **password spray / brute-force attack** against an **exposed RDP service**. The adversary authenticated using valid credentials for the **local administrative account `adam2040`** on **2026-01-11 at 18:40:57 UTC**, originating from the external IP address **50.116.54.114**.
+A remote threat actor successfully compromised the **Windows 11 Pro** endpoint **`Windows-11-pro`** via a **password spray / brute-force attack** against an **exposed RDP service**. The adversary authenticated using valid credentials for the **local administrative account `adam2040`** on **2026-01-11 at 18:40:57 UTC**, originating from the external IP address **50.116.54.114**.
 
 Following initial access, the attacker executed a **fully scripted post-exploitation chain**, which included:
 
