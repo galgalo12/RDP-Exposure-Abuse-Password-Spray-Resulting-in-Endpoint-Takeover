@@ -180,4 +180,27 @@ DeviceNetworkEvents
 
 <img width="1521" height="1121" alt="network" src="https://github.com/user-attachments/assets/6f628fa2-45f8-40d0-bdf2-dc01ee06a6f1" />
 
+# Malicious Execution Chain
+
+Manual Reconnaissance Commands (01:21 – 10:26)
+
+- `systeminfo`
+- `whoami`
+- `net user`
+- `net localgroup administrators`
+- `ipconfig /all`
+- `netstat -ano`
+- `tasklist /svc`
+- `wmic computersystem get domain`
+
+---
+
+## Script Execution (19:26 – 19:38)
+
+- `update_check.ps1: Unknown function (requires collection)`
+
+- `wmi_maintenance.ps1: - Process injection script targeting `msedge.exe`
+  
+- `mscloudsync.ps1 -: Data collection and persistence script`
+
 
