@@ -946,29 +946,20 @@ DeviceRegistryEvents
 5. Collection & Exfiltration Correlation
    
 ```Kql
-    // File staging event
+ // File staging event
 DeviceFileEvents
-| where Timestamp between (datetime(2025-09-16T19:35:00Z) .. datetime(2025-09-16T19:45:00Z))
+| where DeviceName contains "Windows-11-pro"
+| where Timestamp between (datetime(2026-01-11) .. datetime(2026-01-15))
 | where FolderPath has "AppData\\Local\\Temp"
 | where FileName == "backup_sync.zip"
-| project
-    Timestamp,
-    DeviceName,
-    FolderPath,
-    FileName,
-    InitiatingProcessFileName
+| project Timestamp, DeviceName, FolderPath,FileName, InitiatingProcessFileName
 // Join with outbound traffic to known attacker IP
-| join kind=inner (
-    DeviceNetworkEvents
-    | where RemoteIP == "185.92.220.87"
-    | where RemotePort == 8081
-    | where Timestamp between (datetime(2025-09-16T19:35:00Z) .. datetime(2025-09-16T19:50:00Z))
-    | project
-        OutboundTime = Timestamp,
-        DeviceName,
-        InitiatingProcessFileName,
-        RemoteIP,
-        RemotePort
+| join kind=inner ( DeviceNetworkEvents
+| where RemoteIP == "185.92.220.87"
+| where RemotePort == 8081
+| where DeviceName contains "Windows-11-pro"
+| where Timestamp between (datetime(2026-01-11) .. datetime(2026-01-15))
+| project OutboundTime = Timestamp,DeviceName,InitiatingProcessFileName,RemoteIP,RemotePort
 ) on DeviceName
 ```
 
