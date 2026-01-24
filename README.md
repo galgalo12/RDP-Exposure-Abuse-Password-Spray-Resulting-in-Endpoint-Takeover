@@ -402,3 +402,30 @@ The account `adam2040` was confirmed to have **administrative or elevated privil
 - **Registry Path:**  
   `HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows Defender\Exclusions\Paths`
 
+<img width="1430" height="1116" alt="defender" src="https://github.com/user-attachments/assets/f914b1a5-b97b-4ded-b72c-7428afa029f1" />
+
+
+### 2. Masquerading (T1036)
+
+All malicious components were deliberately named to **mimic legitimate Microsoft services** to evade detection.
+
+#### Masqueraded Artifacts
+- `MSUpdateService` → Windows Update Service
+- `MSCloudSync` → Microsoft Cloud Sync
+- `MicrosoftUpdateSync` → Microsoft Update Scheduler
+- `mscloudsync.ps1` → Microsoft cloud sync script
+
+#### Blending Technique
+- File paths were chosen to resemble legitimate Windows locations:
+  - `C:\ProgramData\Microsoft\Windows\Update\`
+
+```Kql
+DeviceFileEvents
+| where DeviceName contains "Windows-11-pro"
+| where Timestamp between (datetime(2026-01-11) .. datetime(2026-01-15))
+| where FileName has_any ("update_check.ps1","wmi_maintenance.ps1","mscloudsync.ps1","msupdate.exe")
+| project Timestamp, DeviceName, FolderPath, FileName, ActionType
+| order by Timestamp desc
+```
+
+
