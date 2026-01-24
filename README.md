@@ -428,4 +428,83 @@ DeviceFileEvents
 | order by Timestamp desc
 ```
 
+### 3. Process Injection (Suspected)
+
+- **Script:** `wmi_mscloudsync.ps1`
+- **Target Process:** `msedge.exe` (Microsoft Edge)
+- **Purpose:** Execute malicious code within a trusted process to evade EDR detection
+
+#### Findings
+- Second-stage payload execution generated **no Microsoft Defender for Endpoint (MDE) alerts**.
+- Command-line activity and script behavior strongly indicate **process injection techniques**.
+- Memory-level confirmation was not performed; therefore, injection remains **suspected but high-confidence**.
+
+#### Detection Gap
+- **EDR Visibility:** Microsoft Defender for Endpoint generated **zero alerts across the entire attack chain**.
+- This indicates **successful evasion of endpoint detection mechanisms**.
+
+---
+
+## Credential Access
+
+### Assessment
+- **No credential dumping or credential access activity detected**.
+- No evidence of LSASS access, credential harvesting tools, or password extraction techniques was observed.
+
+## Checks Performed
+
+Comprehensive hunting queries were executed to identify potential credential access activity, including:
+
+- **LSASS memory access**
+  - `lsass.exe`, `procdump`, `rundll32`, `comsvcs.dll`
+- **Registry hive dumping**
+  - `reg save` of `SAM`, `SECURITY`, `SYSTEM` hives
+- **Credential theft tools**
+  - `mimikatz`, `sekurlsa`, `nanodump`, `Get-Credential`
+- **Volume Shadow Copy abuse**
+  - `vssadmin`
+
+### Results
+- No command-line or process activity related to credential dumping was observed within the investigation timeframe.
+
+---
+
+## Analysis
+
+The absence of credential theft activity suggests:
+
+- The attacker did **not require additional credentials** to meet their objectives.
+- Command-and-control (C2) beacon activity may have occurred **in-memory**, bypassing command-line logging.
+- The compromise may have been **limited to local data access and exfiltration objectives**.
+
+### Recommendation
+- **Escalate to Tier 2** for memory forensics and deeper analysis to confirm the absence of stealthy credential theft techniques.
+
+---
+
+## Discovery
+
+### Discovery Commands Executed
+The attacker executed a scripted sequence of reconnaissance commands via `cmd.exe` and `powershell.exe`.
+
+### Discovery Analysis
+
+**Behavior Pattern**
+- All commands executed in **rapid succession (within ~2 minutes)**, indicating:
+  - Automated or tool-assisted execution
+  - Pre-scripted reconnaissance phase
+  - Lack of interactive or exploratory behavior
+
+**Focus Areas**
+- Host reconnaissance (OS version, running processes, services)
+- Privilege and group membership enumeration
+- Network discovery and domain environment assessment
+
+**Not Observed**
+- No Active Directory enumeration tools were used (e.g., `nltest`, `dsquery`).
+
+### Key Finding
+- Execution of `wmic computersystem get domain` suggests the attacker assessed **lateral movement potential**.
+- No subsequent lateral movement or domain-based activity was observed.
+
 
