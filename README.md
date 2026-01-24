@@ -195,7 +195,7 @@ Manual Reconnaissance Commands (01:21 – 10:26)
 
 ---
 
-## Script Execution (19:26 – 19:38)
+## Script Execution (01:05 - 01:07)
 
 - `update_check.ps1: Unknown function (requires collection)`
 
@@ -203,4 +203,161 @@ Manual Reconnaissance Commands (01:21 – 10:26)
   
 - `mscloudsync.ps1 -: Data collection and persistence script`
 
+<img width="1129" height="814" alt="zip" src="https://github.com/user-attachments/assets/a7fb9ef9-7c3a-414c-b2d0-64f2b8192637" />
 
+Persistence Mechanism Creation (01:06 - 01:07)
+
+## Persistence Mechanisms
+
+### Fake Windows Service
+- **Service Name:** `MSUpdateService`
+
+### Registry Persistence
+- **Run Key:** `MSCloudSync`
+
+### Scheduled Task
+- **Task Name:** `MicrosoftUpdateSync`
+
+<img width="1100" height="1108" alt="update" src="https://github.com/user-attachments/assets/3c58ead7-e6b3-4182-bd4e-129a5fb16484" />
+
+## Process Injection Evidence
+
+- **Suspected Script:** `wmi_maintenance.ps1`
+- **Injection Target:** `msedge.exe`
+
+### Description
+- The script contains logic consistent with **process injection** techniques.
+- Execution of `wmi_maintenance.ps1` initiated malicious activity by injecting into a legitimate process (`msedge.exe`).
+- The technique appears **designed to evade EDR logging and antivirus detection**.
+
+### Detection & Response
+- **Microsoft Defender for Endpoint (MDE):** No alerts generated during execution.
+- This indicates **successful evasion** of endpoint security controls.
+
+## Malicious / Attacker-Created Artifacts
+
+### Fake Microsoft Update Directory
+**Path:**  
+`C:\ProgramData\Microsoft\Windows\Update*`
+
+- Masquerades as a legitimate Windows Update location
+- **Contains:**
+  - `mscloudsync.ps1` — persistence and data collection script
+
+---
+
+### Public User Directory Abuse
+**Path:**  
+`C:\Users\Public*`
+
+- User-writable directory abused for malware staging
+- **Contains:**
+  - `msupdate.exe`
+  - `update_check.ps1`
+
+---
+
+### Temporary Directory (Data Staging / Exfiltration)
+**Path:**  
+`C:\Users\adam2040\AppData\Local\Temp*`
+
+- Used as a staging location for stolen data
+- **Contains:**
+  - `backup_sync.zip` — suspected exfiltration archive
+
+---
+
+### WMI Log Directory Abuse
+**Path:**  
+`C:\Windows\System32\LogFiles\WMI*`
+
+- Unusual location for PowerShell scripts
+- **Contains:**
+  - `wmi_maintenance.ps1` — **high-confidence process injection script**
+
+## Legitimate Windows Folders (Abused)
+
+### System32 Abuse
+**Path:**  
+`C:\Windows\System32*`
+
+- Legitimate Windows system directory
+- Abused by the attacker to execute `cmd.exe` as part of malicious activity
+
+---
+
+### PowerShell Engine Abuse
+**Path:**  
+`C:\Windows\System32\WindowsPowerShell\v1.0*`
+
+- Standard PowerShell installation path
+- Used to execute malicious PowerShell scripts while blending in with legitimate activity
+
+---
+
+## Key Observations
+- The attacker deliberately used  
+  `C:\ProgramData\Microsoft\Windows\Update`  
+  to **blend in with legitimate Microsoft Update processes**.
+- A mix of **user-writable directories** (e.g., `C:\Users\Public\`) and **system directories** was used to reduce suspicion.
+- Temporary directories were leveraged for **data staging prior to exfiltration**, indicating an organized attack workflow.
+
+<img width="1649" height="1353" alt="exfiltrationi" src="https://github.com/user-attachments/assets/576ac25a-b489-4f77-acb6-b3d4afc35237" />
+
+==
+
+Environment Scope: All malicious execution isolated to host adam2040 only. No other devices contacted malicious IPs or executed suspicious scripts.
+
+```KQL
+// Pivot to network events from flare to candidate IP
+DeviceNetworkEvents
+| where DeviceName contains "Windows-11-pro"
+| where Timestamp between (datetime(2026-01-11) .. datetime(2026-01-15))
+| where RemoteIP == "50.116.54.114"
+| where InitiatingProcessCommandLine contains "svchost.exe"
+| project Timestamp, RemoteIP, RemotePort, InitiatingProcessFileName
+```
+<img width="1521" height="1121" alt="network" src="https://github.com/user-attachments/assets/4c7aeeac-2c03-404d-b197-6ab372df7256" />
+
+## Persistence Mechanisms Deployed
+
+### 1. Fake Windows Service — `MSUpdateService`
+- **Registry Path:**  
+  `HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\MSUpdateService`
+- **Binary Path:**  
+  `C:\ProgramData\Microsoft\Windows\Update\mscloudsync.ps1`
+- **Purpose:** Execute malicious payload on system boot
+- **Masquerading:** Designed to appear as a legitimate Microsoft Update service
+
+---
+
+### 2. Registry Run Key — `MSCloudSync`
+- **Registry Path:**  
+  `HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Run`
+- **Value Name:** `MSCloudSync`
+- **Value Data:** PowerShell execution of `mscloudsync.ps1`
+- **Purpose:** Execute payload on user login
+- **Masquerading:** Mimics a Microsoft cloud synchronization service
+
+---
+
+### 3. Scheduled Task — `MicrosoftUpdateSync`
+- **Registry Path:**  
+  `TaskCache\Tree\MicrosoftUpdateSync`
+- **Creation Time:** `2026-01-11 01:06:26`
+- **Purpose:** Additional persistence and execution trigger
+- **Masquerading:** Mimics Windows Update scheduling behavior
+
+
+```kql
+// Registry hunt for persistence mechanisms
+DeviceRegistryEvents
+| where DeviceName contains "Windows-11-pro"
+| where Timestamp between (datetime(2026-01-11) .. datetime(2026-01-15))
+| where RegistryKey has_any ("MSUUpdateService","MSUpdateService")
+    or RegistryValueData contains "mscloudsync"
+| project Timestamp, DeviceName, RegistryKey, RegistryValueName, RegistryValueData, ActionType
+| order by Timestamp desc
+```
+
+<img width="1534" height="1128" alt="regis" src="https://github.com/user-attachments/assets/40a0afdc-6390-46ff-b3e2-4cad318b10eb" />
