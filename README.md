@@ -507,4 +507,134 @@ The attacker executed a scripted sequence of reconnaissance commands via `cmd.ex
 - Execution of `wmic computersystem get domain` suggests the attacker assessed **lateral movement potential**.
 - No subsequent lateral movement or domain-based activity was observed.
 
+### Discovery Commands Executed
+
+## Lateral Movement
+
+### Assessment
+- **No lateral movement detected.**
+
+---
+
+## Checks Performed
+
+### 1. Account Reuse on Other Hosts
+- **Query:** Searched for usage of the `adam2040` account across all devices
+- **Result:** No successful logons observed on any host other than `Windows-11-pro`
+
+---
+
+### 2. Remote Execution Tools
+- **Query:** Searched for evidence of:
+  - PsExec
+  - WMI-based remote execution
+  - WinRM
+  - `Invoke-Command`
+  - `New-PSSession`
+- **Result:** No evidence of remote execution tools used
+
+---
+
+### 3. Cross-Host Process Execution
+- **Query:** Reviewed process creation events associated with the `adam2040` account
+- **Result:** All observed process activity was limited to `Windows-11-pro`
+
+---
+
+### 4. Lateral Network Connections
+- **Query:** Investigated internal network connections using common lateral movement ports:
+  - `135` (RPC)
+  - `139` (NetBIOS)
+  - `445` (SMB)
+  - `3389` (RDP)
+- **Result:** No internal lateral connections were observed
+```Kql
+// General Discovery Commands from Attacker Account
+DeviceProcessEvents
+| where DeviceName contains "Windows-11-pro"
+| where Timestamp between (datetime(2026-01-11) .. datetime(2026-01-15))
+| where ProcessCommandLine has_any ("systeminfo", "whoami", "tasklist", "ipconfig",
+    "netstat", "net user", "net localgroup", "nltest", "dsquery")
+| project Timestamp, DeviceName, FileName, ProcessCommandLine, InitiatingProcessFileName
+| order by Timestamp asc
+```
+
+<img width="1541" height="1278" alt="discovery" src="https://github.com/user-attachments/assets/bf878582-5bce-4b9e-a8a1-438f5b31908a" />
+
+### Domain Discovery Evidence
+
+Single Command: wmic computersystem get domain executed at 01:07:22
+
+```Kql
+DeviceProcessEvents
+| where DeviceName contains "Windows-11-pro"
+| where Timestamp between (datetime(2026-01-11) .. datetime(2026-01-15))
+| where InitiatingProcessAccountName == "adam2040"
+| where ProcessCommandLine contains "wmic computersystem get domain"
+| project Timestamp, FileName, ProcessCommandLine
+```
+### Domain Discovery Assessment
+
+This command is commonly used to:
+
+- Fingerprint the domain environment
+- Assess lateral movement opportunities
+- Determine whether the host is domain-joined
+
+**Conclusion:**  
+The attacker performed domain discovery to assess the environment but did **not** proceed with lateral movement.
+
+This suggests one of the following:
+
+1. The attack objective was limited to **local data exfiltration**
+2. Lateral movement phases had **not yet begun** at the time of detection
+3. The compromised host was the **intended target**
+
+**Scope:**  
+All malicious activity remains isolated to host `adam2040`. No other systems were compromised.
+
+---
+
+## Collection
+
+Files Staged for Exfiltration
+
+```KQL
+ // Find staged sensitive files and correlate with C2
+DeviceFileEvents
+| where Timestamp between (datetime(2026-01-11) .. datetime(2026-01-15))
+| where FolderPath has_any ("Documents", "AppData\\Local\\Temp")
+    and FileName has_any ("backup_sync.zip", "network_credentials.txt", "financial_report_Q4.pdf")
+| project Timestamp, DeviceName, InitiatingProcessFileName, FolderPath, FileName, ActionType
+| join kind=inner (
+    DeviceNetworkEvents
+    //| where RemoteIP == "185.92.220.87" and RemotePort == 8081
+    | project OutboundTime=Timestamp, DeviceName, InitiatingProcessFileName, RemoteIP, RemotePort, Protocol
+) on DeviceName
+```
+<img width="649" height="353" alt="exfiltrationi" src="https://github.com/user-attachments/assets/5a4273a6-b9cf-442f-a6b3-0b87275e5107" />
+
+
+### Collected Artifacts
+
+| Timestamp | Filename                  | Location                                      | Initiating Process |
+|----------|---------------------------|-----------------------------------------------|--------------------|
+| 01:08:26 | network_credentials.txt   | C:\Users\adam2040\Documents\                  | powershell.exe     |
+| 01:08:26 | financial_report_Q4.pdf   | C:\Users\adam204\Documents\                   | powershell.exe     |
+| 01:08:27 | backup_sync.zip           | C:\Users\adam2040\AppData\Local\Temp\         | powershell.exe     |
+
+### Collection Process
+
+#### File Discovery (01:08 – 01:20)
+The attacker enumerated multiple directories commonly used to store sensitive user data:
+
+- `C:\Users\adam2040\Documents\`
+- `C:\Users\adam2040\Downloads\`
+- `C:\Users\adam2040\Desktop\`
+- `C:\Users\adam2040\AppData\Local\Temp\`
+
+#### Archive Creation (01:08:06)
+- A compressed archive, `backup_sync.zip`, was created via `powershell.exe`.
+- The archive likely contains collected sensitive files.
+- The file was stored in the user’s temporary directory, indicating **data staging prior to exfiltration**.
 
