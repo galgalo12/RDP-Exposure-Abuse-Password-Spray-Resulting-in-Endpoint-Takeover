@@ -361,3 +361,44 @@ DeviceRegistryEvents
 ```
 
 <img width="1534" height="1128" alt="regis" src="https://github.com/user-attachments/assets/40a0afdc-6390-46ff-b3e2-4cad318b10eb" />
+
+
+## Scope Validation
+
+- All identified persistence mechanisms were **isolated to a single host**: `Windows-11-pro`.
+- No other systems in the environment showed indicators of:
+  - Fake Windows services
+  - Registry Run key abuse
+  - Malicious scheduled tasks
+- No evidence of lateral movement or persistence deployment on additional hosts was observed.
+
+---
+
+## Privilege Escalation
+
+### Assessment
+**Not applicable.**  
+The compromised account already possessed sufficient privileges to achieve attacker objectives.
+
+### Privileged Access Confirmation
+The account `adam2040` was confirmed to have **administrative or elevated privileges**, as evidenced by the ability to:
+
+- Create and manage Windows services
+- Modify `HKEY_LOCAL_MACHINE` registry keys
+- Create scheduled tasks
+- Add Microsoft Defender exclusions
+
+### Conclusion
+- No additional privilege escalation techniques were observed.
+- Elevated access was available from initial compromise and remained sufficient throughout the attack lifecycle.
+
+## Defense Evasion
+
+### 1. Windows Defender Exclusions
+- **Timestamp:** `2025-09-16 19:39:48`
+- **Purpose:** Bypass signature-based detection of malicious executables
+- **Folder Exclusion:**  
+  `C:\Windows\Temp`
+- **Registry Path:**  
+  `HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows Defender\Exclusions\Paths`
+
