@@ -703,6 +703,7 @@ The attacker enumerated multiple directories commonly used to store sensitive us
 KQL : 
 // Find staged sensitive files and correlate with C2
 DeviceFileEvents
+| where DeviceName contains "Windows-11-pro"
 | where Timestamp between (datetime(2026-01-11) .. datetime(2026-01-15))
 | where FolderPath has_any ("Documents", @"AppData\Local\Temp")
 | where FileName has_any ( "backup_sync.zip", "network_credentials.txt", "financial_report_Q4.pdf")
@@ -910,7 +911,8 @@ DeviceLogonEvents
 ```Kql
 // Find suspect scripts / filenames in the execution window
 DeviceProcessEvents
-| where Timestamp between (datetime(2025-09-16 18:40:57) .. datetime(2025-09-17 00:40:57))
+| where DeviceName contains "Windows-11-pro"
+| where Timestamp between (datetime(2026-01-11) .. datetime(2026-01-15))
 | where FileName in ("msupdate.exe", "powershell.exe", "cmd.exe")
    or ProcessCommandLine contains "update_check.ps1"
    or ProcessCommandLine contains "wmi_maintenance.ps1"
@@ -922,9 +924,8 @@ DeviceProcessEvents
 ```Kql
 // Known persistence registry and service entries
 DeviceRegistryEvents
-| where DeviceName == "flare"
-| where InitiatingProcessAccountName == "slflare"
-| where Timestamp between (datetime(2025-09-16 18:40:57) .. datetime(2025-09-17 00:40:57))
+| where DeviceName contains "Windows-11-pro"
+| where Timestamp between (datetime(2026-01-11) .. datetime(2026-01-15))
 | where RegistryKey has_any (
     @"HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services",
     @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Run"
@@ -938,7 +939,8 @@ DeviceRegistryEvents
 ```Kql
 // Defender exclusion hunting
 DeviceRegistryEvents
-| where DeviceName contains "flare"
+| where DeviceName contains "Windows-11-pro"
+| where Timestamp between (datetime(2026-01-11) .. datetime(2026-01-15))
 | where RegistryKey contains "Windows Defender"
 | where RegistryKey contains "Exclusions"
 | project Timestamp, RegistryKey,  RegistryValueName, InitiatingProcessAccountName
