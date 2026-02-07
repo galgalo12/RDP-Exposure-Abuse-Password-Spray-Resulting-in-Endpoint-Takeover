@@ -899,8 +899,8 @@ The complete absence of EDR alerts throughout the attack chain indicates **effec
 ```kql
 // Find candidate attacker IPs (failed attempts + at least one success)
 DeviceLogonEvents
-| where DeviceName contains "flare"
-| where Timestamp between (datetime(2025-09-14) .. datetime(2025-09-18))
+| where DeviceName contains "Windows-11-pro"
+| where Timestamp between (datetime(2026-01-11) .. datetime(2026-01-15))
 | summarize Failures = countif(ActionType == "LogonFailed"),Successes = countif(ActionType == "LogonSuccess"), Users = dcount(AccountName)
   by RemoteIP
 | where Failures > 3 and Successes > 0 and Users > 1
