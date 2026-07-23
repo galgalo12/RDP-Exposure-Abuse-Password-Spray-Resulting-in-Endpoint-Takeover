@@ -23,7 +23,52 @@ Notably, **Microsoft Defender for Endpoint (MDE)** generated **no alerts at any 
 No evidence of **lateral movement** or **credential dumping** was observed. All malicious activity remained **fully contained to the compromised host**.
 
 
-## 🔓 Initial Access
+## 🔓 Stage 1: Initial Access (RDP Compromise)
+
+
+# 🚨 Incident Report: Initial Access – RDP Compromise
+## 🖥️ Host
+`Azure-Active-VM` (DeviceId: `1ea3d06c610a2fd54c...`)
+## ⏱️ Timeframe
+June 13, 2026, 7:07 PM – 7:13 PM
+## 📋 Summary
+Logon events were captured on the host. Most were benign service logons. Some indicate potential initial access activity.
+## 🔍 Findings
+### ✅ Service logons (benign)
+- Interactive logons for `umfd-0`, `umfd-1` (Font Driver Host)
+- Interactive logons for `dwm-1` (Desktop Window Manager)
+- Auth via Negotiate, well-known local SIDs
+- Normal Windows session startup behavior
+### ⚠️ Machine account activity
+- `azure-active-vm$` under domain `adam.local.com`
+- Two `LogonAttempted` events, Unknown logon type
+- Timestamps: 7:08:17 PM, 7:08:20 PM
+### 🔑 Network authentication (notable)
+- Account: `adam`
+- SID: `S-1-5-21-911204350...`
+- Logon type: Network, Protocol: Kerberos
+- Multiple successes, 7:07:49 PM – 7:13:10 PM
+- One event shows `IsLocalAdmin = 0`
+## ❓ Gaps
+- No `RemoteInteractive` (Type 10) logon observed yet
+- Type 10 is required to confirm actual RDP session
+## 🛠️ Next Steps
+- Filter `LogonType == "RemoteInteractive"`
+- Check `RemoteIP` / `RemoteIPCountry` fields
+- Pivot `adam` account into `DeviceProcessEvents`
+- Check `DeviceNetworkEvents` for port `3389` traffic in this window
+## 📸 Screenshot during investigation
+<img width="979" height="362" alt="Initial Access (RDP Compromise)" src="https://github.com/user-attachments/assets/1012b5e6-e9ac-49f8-81dc-8b0cfcedde11" />
+
+
+
+
+
+
+
+
+
+
 
 **MITRE ATT&CK Technique:**  
 - **T1110.001 – Brute Force: Password Guessing**
